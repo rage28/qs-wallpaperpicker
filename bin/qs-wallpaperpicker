@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # qs-wallpaperpicker: the Quickshell wallpaper picker.
-# Installed by qs-wallpaperpicker's install.sh.
+# Runs either a Nix-packaged config or a source/install.sh checkout.
 #
 #   qs-wallpaperpicker              start it (put this in your autostart)
 #   qs-wallpaperpicker toggle       open/close the picker
@@ -12,9 +12,20 @@
 #   qs-wallpaperpicker log          its log
 set -euo pipefail
 
-cfg="${XDG_CONFIG_HOME:-$HOME/.config}/qs-wallpaperpicker"
+user_cfg="${XDG_CONFIG_HOME:-$HOME/.config}/qs-wallpaperpicker"
+cfg="${QS_WALLPAPERPICKER_CONFIG:-$user_cfg}"
+
+# QML and Noctalia write mutable state here even when the application itself
+# lives in the read-only Nix store. Keep the shipped template available at a
+# stable user path for Noctalia's config.
+mkdir -p "$user_cfg/colors" "$user_cfg/noctalia"
+if [[ -f $cfg/extras/noctalia/quickshell.json ]]; then
+    install -m 0644 "$cfg/extras/noctalia/quickshell.json" "$user_cfg/noctalia/quickshell.json"
+    install -m 0644 "$cfg/extras/noctalia/qs-wallpaperpicker.toml" "$user_cfg/noctalia/qs-wallpaperpicker.toml"
+fi
+
 case ${1-} in -h | --help | help) ;; *)
-    [[ -f $cfg/shell.qml ]] || { echo "qs-wallpaperpicker: no config in $cfg (run its install.sh)" >&2; exit 1; } ;;
+    [[ -f $cfg/shell.qml ]] || { echo "qs-wallpaperpicker: no Quickshell config found in $cfg" >&2; exit 1; } ;;
 esac
 
 usage() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; }
