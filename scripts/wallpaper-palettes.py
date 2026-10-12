@@ -1,26 +1,24 @@
 #!/usr/bin/env python3
-"""The colour scheme matugen would make from each wallpaper, for the
+"""The colour scheme Noctalia would make from each wallpaper, for the
 wallpaper picker's swatch cards (services/WallpaperSwatches.qml).
 
-    wallpaper-palettes.py DIR NAME...
+    wallpaper-palettes.py --scheme SCHEME DIR NAME...
 
-matugen runs as a dry run (nothing is written or applied) with the options
-services/WallpaperEngine.qml sets wallpapers with, so a card shows the exact
-scheme its wallpaper will give. Prints one JSON line per wallpaper as soon as
-it's read:
+Noctalia's theme CLI runs without applying anything, using the same scheme as
+the shell, so a card shows the palette its wallpaper will give. Prints one JSON
+line per wallpaper as soon as it's read:
 
     {"n": name, "m": mtime, "s": bytes, "w": width, "h": height,
-     "c": {role: "#rrggbb", ...}}
+     "g": scheme, "c": {role: "#rrggbb", ...}}
 
-with "e": 1 instead of "c" when matugen can't read the image. A video is
-read from a frame of it (scripts/wallpaper-still), whose path comes as "f";
-"w" and "h" are the frame's. A line on stdin
-of tab-separated names moves those names to the front of the queue, in that
-order (the picker sends the cards in view).
+with "e": 1 instead of "c" when Noctalia can't read the image. A line on
+stdin of tab-separated names moves those names to the front of the queue, in
+that order (the picker sends the cards in view).
 """
 
 import json
 import os
+import shutil
 import struct
 import subprocess
 import sys
@@ -28,9 +26,6 @@ import threading
 from collections import deque
 
 WORKERS = 3
-
-STILL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wallpaper-still")
-VIDEO = (".mp4", ".webm", ".mkv", ".mov", ".m4v")
 
 ROLES = (
     "background", "surface", "surface_container_lowest", "surface_container_low",
@@ -95,33 +90,29 @@ def image_size(path):
     return 0, 0
 
 
-def still(path):
-    """A video's grabbed frame (cached by wallpaper-still), or None."""
-    try:
-        out = subprocess.run([STILL, path], capture_output=True, text=True, timeout=120)
-        frame = out.stdout.strip()
-        return frame if out.returncode == 0 and frame else None
-    except (OSError, subprocess.SubprocessError):
-        return None
-
-
-def scheme(path):
+def palette(path, scheme):
     try:
         out = subprocess.run(
-            ["matugen", "image", path, "--source-color-index", "0", "--dry-run", "-j", "hex", "-q"],
+            ["noctalia", "theme", path, "--scheme", scheme, "--dark"],
             capture_output=True, text=True, timeout=90,
         )
-        colors = json.loads(out.stdout)["colors"]
-        return {r: (colors[r].get("default") or colors[r]["dark"])["color"] for r in ROLES if r in colors}
-    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+        if out.returncode != 0:
+            return None
+        colors = json.loads(out.stdout)
+        return {role: colors[role] for role in ROLES if isinstance(colors.get(role), str)}
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError):
         return None
 
 
 def main():
-    if len(sys.argv) < 2:
-        sys.exit("usage: wallpaper-palettes.py DIR NAME...")
-    folder = sys.argv[1]
-    queue = deque(dict.fromkeys(sys.argv[2:]))
+    if len(sys.argv) < 4 or sys.argv[1] != "--scheme":
+        sys.exit("usage: wallpaper-palettes.py --scheme SCHEME DIR NAME...")
+    scheme = sys.argv[2]
+    folder = sys.argv[3]
+    queue = deque(dict.fromkeys(sys.argv[4:]))
+    if shutil.which("noctalia") is None:
+        print("wallpaper-palettes: noctalia is not installed", file=sys.stderr)
+        return 127
     lock = threading.Lock()
     out = threading.Lock()
 
@@ -147,14 +138,9 @@ def main():
                 st = os.stat(path)
             except OSError:
                 continue
-            record = {"n": name, "m": int(st.st_mtime), "s": st.st_size}
-            image = path
-            if name.lower().endswith(VIDEO):
-                image = still(path)
-                if image:
-                    record["f"] = image
-            record["w"], record["h"] = image_size(image) if image else (0, 0)
-            colors = scheme(image) if image else None
+            record = {"n": name, "m": int(st.st_mtime), "s": st.st_size, "g": scheme}
+            record["w"], record["h"] = image_size(path)
+            colors = palette(path, scheme)
             if colors:
                 record["c"] = colors
             else:
@@ -168,7 +154,8 @@ def main():
         t.start()
     for t in workers:
         t.join()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

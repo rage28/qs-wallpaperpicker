@@ -17,9 +17,9 @@ Item {
 
     // { fileName, fileUrl, ... } as the picker lists it.
     property var entry: null
-    // What the card shows (a video's frame rather than the video).
+    // What the card shows.
     property string picture: entry ? entry.fileUrl : ""
-    // The matugen scheme ({ role: "#rrggbb" }), or null until it's read.
+    // The Noctalia scheme ({ role: "#rrggbb" }), or null until it's read.
     property var scheme: null
     // Wallhaven's colours for the image, when there's no scheme.
     property var imageColors: []
@@ -38,7 +38,7 @@ Item {
     property string title: ""
     property string meta: ""
     // The picture drawn from a texture instead, over the plain one: the
-    // video playing in the picker's preview, or the preview's own sharper
+    // animation playing in the picker's preview, or the preview's own sharper
     // image for a card shown large. `art` is an Image or a
     // ShaderEffectSource, `artAspect` its width over its height.
     property var art: null
@@ -126,7 +126,7 @@ Item {
             Glyph {
                 anchors.centerIn: parent
                 visible: thumb.status !== Image.Ready
-                text: thumb.status === Image.Error ? "broken_image" : card.entry && card.entry.video ? "movie" : "image"
+                text: thumb.status === Image.Error ? "broken_image" : "image"
                 font.pixelSize: 22 * card.u
                 color: Colors.withAlpha(card.dress.muted, 0.5)
             }

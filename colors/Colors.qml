@@ -6,6 +6,8 @@ import Quickshell.Io
 Singleton {
     id: root
 
+    readonly property string configDir: (Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config") + "/qs-wallpaperpicker"
+
     // Parse the JSON file whenever it changes (after reload)
     readonly property var _colorsData: {
         const text = colorsFile.text();
@@ -93,7 +95,7 @@ Singleton {
     // File viewer – watches for changes and triggers a debounced reload
     FileView {
         id: colorsFile
-        path: Quickshell.shellPath("colors/Colors.json")
+        path: root.configDir + "/colors/Colors.json"
         printErrors: false
         watchChanges: true
         onFileChanged: reloadTimer.restart()

@@ -1,7 +1,7 @@
 import QtQuick
 
 // A picture in the wallpaper picker drawn from a texture: the preview's own
-// image, or a ShaderEffectSource of the video playing in it. It fills the
+// image, or a ShaderEffectSource of the animation playing in it. It fills the
 // item the way Image.PreserveAspectCrop does, with rounded corners, and a
 // band of light can sweep across it (shaders/card_picture.frag).
 ShaderEffect {

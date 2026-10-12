@@ -8,18 +8,18 @@ import QtQuick
 // picker (modules/wallpaper): its swatch cards wear these colours, the colour
 // sort orders by them and the spectrum ribbon draws them.
 //
-// scripts/wallpaper-palettes.py runs matugen on each image as a dry run
-// (nothing is applied), with WallpaperEngine's options, so a card shows the
-// scheme its wallpaper will actually set. It only runs when the picker asks,
-// niced, and each file is read once: results are cached in
+// scripts/wallpaper-palettes.py runs Noctalia's theme generator on each image
+// without applying it. It uses Noctalia's active wallpaper scheme so a card
+// shows the scheme its wallpaper will actually set. It only runs when the
+// picker asks, niced, and each file is read once: results are cached in
 // ~/.cache/quickshell/wallpaper-palettes.json by file name and mtime.
 Singleton {
     id: root
 
     readonly property string dir: WallpaperEngine.dir
 
-    // File name -> { m: mtime (s), s: bytes, w, h, c: { role: "#rrggbb" } };
-    // `e` instead of `c` when matugen couldn't read the image.
+    // File name -> { m: mtime (s), s: bytes, w, h, g: scheme,
+    // c: { role: "#rrggbb" } }; `e` instead of `c` on failure.
     property var entries: ({})
     // Bumped whenever `entries` changes.
     property int revision: 0
@@ -38,6 +38,9 @@ Singleton {
     property var _files: null
     property bool _again: false
     property var _batch: ({})
+    property string paletteScheme: "m3-content"
+    property bool _schemeReady: false
+    property bool _providerUnavailable: false
 
     function entry(name) {
         return entries[name] ?? null;
@@ -49,8 +52,8 @@ Singleton {
         return e && e.c ? e.c : null;
     }
 
-    // matugen's seed when an image has no colour to give (Google blue): a
-    // grey wallpaper, not a blue one.
+    // Material's fallback seed when an image has no colour to give (Google
+    // blue): represent it as a grey wallpaper, not a blue one.
     readonly property string fallbackSeed: "#4285f4"
 
     // The colour a wallpaper stands for (its scheme's source colour; a grey
@@ -120,7 +123,7 @@ Singleton {
     // first. Cache entries for files that are gone are dropped.
     function ensure(files) {
         _files = files;
-        if (!_loaded)
+        if (!_loaded || !_schemeReady || _providerUnavailable)
             return;
         if (worker.running) {
             _again = true;
@@ -146,15 +149,35 @@ Singleton {
         for (const f of files) {
             const e = entries[f.fileName];
             const m = f.modified ? Math.floor(f.modified.getTime() / 1000) : -1;
-            if (!e || (m >= 0 && e.m !== m))
+            if (!e || e.g !== paletteScheme || (m >= 0 && e.m !== m))
                 missing.push(f.fileName);
         }
         if (missing.length === 0)
             return;
         total = missing.length;
         read = 0;
-        worker.command = ["nice", "-n", "19", "python3", Quickshell.shellPath("scripts/wallpaper-palettes.py"), dir].concat(missing);
+        worker.command = ["nice", "-n", "19", "python3", Quickshell.shellPath("scripts/wallpaper-palettes.py"), "--scheme", paletteScheme, dir].concat(missing);
         worker.running = true;
+    }
+
+    // Noctalia reports "wallpaper <scheme>". If it is unavailable or uses a
+    // non-wallpaper palette, use Noctalia's documented wallpaper default.
+    Process {
+        id: schemeProbe
+        running: true
+        command: ["noctalia", "msg", "color-scheme-get"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const parts = text.trim().split(/\s+/);
+                if (parts.length >= 2 && parts[0] === "wallpaper")
+                    root.paletteScheme = parts.slice(1).join(" ");
+            }
+        }
+        onExited: {
+            root._schemeReady = true;
+            if (root._files)
+                root.ensure(root._files);
+        }
     }
 
     // Moves these names (still waiting to be read) to the front of the queue.
@@ -199,10 +222,13 @@ Singleton {
                     console.warn("wallpaper swatches:", text.trim());
             }
         }
-        onExited: {
+        onExited: code => {
             root._flush();
             root.scanFinished();
-            if (root._again) {
+            if (code === 127) {
+                root._providerUnavailable = true;
+                root._again = false;
+            } else if (root._again) {
                 root._again = false;
                 Qt.callLater(() => root.ensure(root._files));
             }
@@ -219,7 +245,7 @@ Singleton {
     Timer {
         id: saveTimer
         interval: 1500
-        onTriggered: cache.setText(JSON.stringify({ version: 1, entries: root.entries }))
+        onTriggered: cache.setText(JSON.stringify({ version: 2, provider: "noctalia", entries: root.entries }))
     }
 
     FileView {
@@ -229,7 +255,7 @@ Singleton {
         onLoaded: {
             try {
                 const d = JSON.parse(text());
-                if (d && d.version === 1 && d.entries)
+                if (d && d.version === 2 && d.provider === "noctalia" && d.entries)
                     root.entries = d.entries;
             } catch (e) {
                 console.warn("wallpaper swatches: unreadable cache,", e);

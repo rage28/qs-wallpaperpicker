@@ -5,8 +5,7 @@ import Quickshell.Wayland
 import qs.modules.wallpaper
 import qs.services as Services
 
-// The wallpaper (drawn by Quickshell on every screen) and the swatch-deck
-// picker over it:
+// The swatch-deck picker and its optional built-in wallpaper layer:
 //
 //   qs-wallpaperpicker toggle|wallhaven|set <file>|current
 // (bin/qs-wallpaperpicker; underneath, `qs -p <this folder> ipc call

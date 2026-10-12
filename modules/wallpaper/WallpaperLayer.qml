@@ -1,8 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtMultimedia
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.colors
 import qs.modules.desktoptheme
@@ -14,9 +12,8 @@ import qs.services as Services
 //
 // Two slots take turns: the new wallpaper loads into the hidden one, the
 // theme's transition (shaders/wallpaper_transition.frag) runs from the shown
-// one to it, then they swap. A slot draws a still image, an animated GIF/WebP
-// or a muted, looping video; those play only while the screen's workspace has
-// no fullscreen or tiled window over them. Idle, it is just that one item. A
+// one to it, then they swap. A slot draws a still image or animated GIF/WebP.
+// Idle, it is just that one item. A
 // theme layer that reworks the wallpaper itself (Broadsheet's halftone) gets
 // a texture of all this, transitions included, which exists only while it's
 // wanted.
@@ -39,15 +36,6 @@ Scope {
             readonly property Wall back: front === imgA ? imgB : imgA
             property real progress: 0
             property bool waiting: false
-            // Animated wallpapers play only while they can be seen: not under
-            // a fullscreen window, and not behind tiled windows (which leave
-            // just the gaps; Qt also spins its render thread on a video
-            // surface the compositor stops drawing). Floating windows don't
-            // count.
-            readonly property HyprlandWorkspace workspace: Hyprland.monitorFor(modelData)?.activeWorkspace ?? null
-            readonly property bool covered: !!workspace && (workspace.hasFullscreen || Services.Hyprland.windowList.some(w => w.workspace?.id === workspace.id && !w.floating))
-            readonly property bool playing: !covered
-
             function show(path) {
                 if (!path)
                     return;
@@ -83,9 +71,8 @@ Scope {
                 const old = front;
                 front = back;
                 progress = 0;
-                // Under the picker's chosen card the old one only pauses:
-                // unloading a video stalls the shell for a moment, which
-                // the card would show. It goes after the picker.
+                // Under the picker's chosen card, defer unloading the old
+                // image until the picker is gone.
                 if (Services.WallpaperEngine.pickerCovers === modelData.name)
                     old.retired = true;
                 else
@@ -127,7 +114,7 @@ Scope {
                 }
             }
 
-            // Not as the picker goes (its own player unloads then).
+            // Not as the picker goes (its own preview unloads then).
             Timer {
                 id: retireTimer
                 interval: 1500
@@ -142,7 +129,7 @@ Scope {
                 // Replaced under the picker, paused till it's unloaded.
                 property bool retired: false
                 readonly property string kind: Services.WallpaperEngine.kind(path)
-                // Something to show (a video: its first frame is decoded).
+                // Something to show.
                 readonly property bool ready: !!loader.item && loader.item.ready
                 readonly property bool failed: !!loader.item && loader.item.failed
 
@@ -164,7 +151,7 @@ Scope {
                 Loader {
                     id: loader
                     anchors.fill: parent
-                    sourceComponent: !wall.path ? null : wall.kind === "video" ? video : wall.kind === "animated" ? animated : still
+                    sourceComponent: !wall.path ? null : wall.kind === "animated" ? animated : still
                 }
 
                 Component {
@@ -198,79 +185,14 @@ Scope {
                         cache: false
                         smooth: true
                         playing: true
-                        paused: !win.playing || wall.retired
-                    }
-                }
-
-                // Muted (no audio output at all) and looping. It plays until
-                // its first frame is up even when paused, so it never shows
-                // black.
-                Component {
-                    id: video
-
-                    Item {
-                        id: clip
-
-                        property bool shown: false
-                        readonly property bool ready: shown
-                        readonly property bool failed: player.error !== MediaPlayer.NoError
-
-                        function sync() {
-                            if ((win.playing && !wall.retired) || !shown)
-                                player.play();
-                            else
-                                player.pause();
-                        }
-
-                        Component.onCompleted: sync()
-
-                        Connections {
-                            target: win
-
-                            function onPlayingChanged() {
-                                clip.sync();
-                            }
-                        }
-
-                        Connections {
-                            target: wall
-
-                            function onRetiredChanged() {
-                                clip.sync();
-                            }
-                        }
-
-                        MediaPlayer {
-                            id: player
-                            source: "file://" + wall.path
-                            loops: MediaPlayer.Infinite
-                            videoOutput: output
-                            onErrorOccurred: (error, errorString) => console.warn("wallpaper:", errorString)
-                        }
-
-                        VideoOutput {
-                            id: output
-                            anchors.fill: parent
-                            fillMode: VideoOutput.PreserveAspectCrop
-                        }
-
-                        Connections {
-                            target: output.videoSink
-
-                            function onVideoFrameChanged() {
-                                if (!clip.shown) {
-                                    clip.shown = true;
-                                    clip.sync();
-                                }
-                            }
-                        }
+                        paused: wall.retired
                     }
                 }
             }
 
             // The wallpaper as drawn: both slots and the transition. The
             // transition reads the slots through textures that live only
-            // while it runs (so a video keeps moving through it).
+            // while it runs.
             Item {
                 id: stack
                 anchors.fill: parent

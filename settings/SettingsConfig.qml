@@ -4,12 +4,14 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 
-// The picker's settings, kept in settings.json next to this config. The
+// The picker's settings, kept in the user's config directory. The
 // folder, command, API key and the chosen card's animation are set from the
-// picker's gear; the Wallhaven filters from its chips; the live preview
-// from its play button.
+// picker's gear; the Wallhaven filters from its chips; the animated-image
+// preview from its play button.
 Singleton {
     id: root
+
+    readonly property string configDir: (Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config") + "/qs-wallpaperpicker"
 
     property alias wallpaperDir: settingsAdapter.wallpaperDir
     property alias wallpaperCommand: settingsAdapter.wallpaperCommand
@@ -36,23 +38,39 @@ Singleton {
         onTriggered: settingsFile.reload()
     }
 
+    function migrateWallpaperSettings() {
+        if (settingsAdapter.wallpaperSettingsVersion >= 1)
+            return;
+        // Existing installs used an empty command for the built-in renderer.
+        // Move them to the new Noctalia owner once; users may still clear it
+        // afterwards to opt back into the built-in image layer.
+        if (settingsAdapter.wallpaperCommand.trim() === "")
+            settingsAdapter.wallpaperCommand = "noctalia msg wallpaper-set {}";
+        settingsAdapter.wallpaperSettingsVersion = 1;
+    }
+
     FileView {
         id: settingsFile
-        path: Quickshell.shellPath("settings.json")
+        path: root.configDir + "/settings.json"
         watchChanges: true
         onFileChanged: reloadTimer.restart()
         onAdapterUpdated: writeTimer.restart()
+        onLoaded: root.migrateWallpaperSettings()
         onLoadFailed: error => {
-            if (error == FileViewError.FileNotFound)
+            if (error == FileViewError.FileNotFound) {
+                root.migrateWallpaperSettings();
                 writeTimer.restart();
+            }
         }
 
         adapter: JsonAdapter {
             id: settingsAdapter
             property string wallpaperDir: "~/Pictures/wallpapers"
-            // "" = Quickshell draws the wallpaper; else e.g. "swww img {}"
-            property string wallpaperCommand: ""
-            // Videos and animated pictures play in the preview
+            // Noctalia owns the wallpaper by default. Other Wayland wallpaper
+            // tools can still be configured here; "" uses the built-in layer.
+            property string wallpaperCommand: "noctalia msg wallpaper-set {}"
+            property int wallpaperSettingsVersion: 0
+            // Animated GIF/WebP pictures play in the preview
             property bool wallpaperLivePreview: false
             // The card set grows into the wallpaper (false: set straight
             // away, the deck stays open)

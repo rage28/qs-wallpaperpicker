@@ -1,0 +1,11 @@
+[theme]
+source = "wallpaper"
+wallpaper_scheme = "m3-content"
+
+[theme.templates]
+enable_builtin_templates = true
+builtin_ids = ["mango"]
+
+[theme.templates.user.qs_wallpaperpicker]
+input_path = "$XDG_CONFIG_HOME/qs-wallpaperpicker/noctalia/quickshell.json"
+output_path = "$XDG_CONFIG_HOME/qs-wallpaperpicker/colors/Colors.json"

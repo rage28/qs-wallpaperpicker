@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtMultimedia
 import qs.services
 
 // The wallpaper picker's full-screen preview: the card in front, shown at
@@ -12,13 +11,9 @@ import qs.services
 // starts, so a fading image is never swapped out from under its
 // animation (which once left the preview black).
 //
-// Over the still, the live preview: a video (muted, looping) or an
-// animated GIF/WebP playing, `motion` its URL. It fades in once its first
-// frame is up, so the still is never swapped for black, and the one
-// playing fades out before the next one loads. Loading or unloading a
-// player stalls the whole shell for a moment (about a tenth of a second),
-// so the picker changes `motion` only while the deck is at rest; while it
-// moves, `motionPaused` just pauses the one loaded and fades it out.
+// Over the still, an animated GIF/WebP live preview can play. It fades in
+// once its first frame is up, so the still is never swapped for black, and
+// fades out before the next one loads.
 Item {
     id: backdrop
 
@@ -172,48 +167,7 @@ Item {
         Loader {
             id: motionLoader
             anchors.fill: parent
-            sourceComponent: backdrop.playing === "" ? null
-                : WallpaperEngine.kind(backdrop.playing) === "video" ? videoMotion : animatedMotion
-        }
-    }
-
-    // Muted (no audio output at all) and looping.
-    Component {
-        id: videoMotion
-
-        Item {
-            id: movie
-
-            property bool ready: false
-            readonly property bool paused: backdrop.motionPaused
-
-            onPausedChanged: paused ? player.pause() : player.play()
-
-            MediaPlayer {
-                id: player
-                source: backdrop.playing
-                loops: MediaPlayer.Infinite
-                videoOutput: output
-                onErrorOccurred: (error, errorString) => console.warn("wallpaper preview:", errorString)
-                Component.onCompleted: {
-                    if (!movie.paused)
-                        play();
-                }
-            }
-
-            VideoOutput {
-                id: output
-                anchors.fill: parent
-                fillMode: VideoOutput.PreserveAspectCrop
-            }
-
-            Connections {
-                target: output.videoSink
-
-                function onVideoFrameChanged() {
-                    movie.ready = true;
-                }
-            }
+            sourceComponent: backdrop.playing === "" ? null : animatedMotion
         }
     }
 

@@ -153,7 +153,7 @@ install_config() {  # name
             || die "$target already exists and isn't $1; move it away, then run this again"
         [[ $MODE == copy ]] \
             || die "$target is an earlier copy of $1; remove it, or run this again with --copy to update it"
-        # Not the copy's own state: its settings and matugen palette.
+        # Not the copy's own state: its settings and generated palette.
         tar -C "$SRC_DIR" --exclude=./.git --exclude=./settings.json --exclude=./colors/Colors.json -cf - . \
             | tar -C "$target" -xf -
         info "Updated the copy in $target"

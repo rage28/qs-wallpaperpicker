@@ -13,7 +13,7 @@ import qs.settings
 // deck of swatch cards.
 //
 // Every wallpaper is a paint-chip card (SwatchCard) dressed in the colour
-// scheme it would give the desktop, read with matugen as a dry run
+// scheme it would give the desktop, read with Noctalia's theme CLI
 // (services/WallpaperSwatches): the card is the scheme's surface, its text
 // the on-surface, its strip of chips the roles with their hex codes. The
 // cards are held fanned out like a hand along the foot of the screen;
@@ -31,8 +31,7 @@ import qs.settings
 // (~/Pictures/wallpapers by default) and a Wallhaven API key.
 //
 // The live preview (the play button, or V; kept in settings.json) plays
-// videos and animated GIF/WebP wallpapers in the preview and in the card
-// in front, instead of a still of them.
+// animated GIF/WebP wallpapers in the preview and in the card in front.
 //
 // Choosing a card: it leaves the hand for the middle of the screen while
 // the rest of the hand is put away, lights up as it's set, then its
@@ -70,7 +69,7 @@ Item {
     readonly property var sorts: ["name", "colour", "newest"]
 
     // Every local wallpaper as listed: [{ fileName, fileUrl, modified, size,
-    // video }] (a video's picture is a frame of it: pictureOf()).
+    // animated }].
     property var allWallpapers: []
     // ...in the chosen order (set by resort(): the colour sort waits for
     // the colours rather than reshuffling as each one is read).
@@ -143,7 +142,7 @@ Item {
     // ── The live preview ─────────────────────────────────────────────────
     readonly property bool live: SettingsConfig.wallpaperLivePreview
     // Anything in the folder that moves (the toggle shows only then).
-    readonly property bool hasMotion: allWallpapers.some(w => w.video || w.animated)
+    readonly property bool hasMotion: allWallpapers.some(w => w.animated)
 
     // ── Choosing (see the top) ───────────────────────────────────────────
     // The entry being chosen, null the rest of the time.
@@ -151,14 +150,10 @@ Item {
     readonly property bool choosing: chosen !== null
     // In the middle, waiting for its download.
     property bool awaiting: false
-    // In the middle, waiting for its video to be drawn under it (a video
-    // is set only once the card is there: a player starting up stalls the
-    // shell for a moment, which would show as a jolt on the way).
-    property bool settling: false
     // Its wallpaper is set (the card wears the "current" tag from then).
     property bool chosenSet: false
     // It was playing in the preview when it was chosen, so its picture is
-    // that video.
+    // that animation.
     property bool chosenLive: false
     // The picker steps back (0..1) and the screen dims behind the card.
     property real hush: 0
@@ -216,20 +211,14 @@ Item {
         return entry && !entry.item ? WallpaperSwatches.scheme(entry.fileName) : null;
     }
 
-    // The picture a card and the preview show: a video's grabbed frame (once
-    // the swatch worker has it), the file itself for anything else.
+    // The picture a card and the preview show.
     function pictureOf(entry) {
-        if (!entry)
-            return "";
-        if (!entry.video)
-            return entry.fileUrl;
-        const e = WallpaperSwatches.entry(entry.fileName);
-        return e && e.f ? "file://" + e.f : "";
+        return entry ? entry.fileUrl : "";
     }
 
     // What the live preview plays for a card: the file, when it moves.
     function motionOf(entry) {
-        return entry && !entry.item && (entry.video || entry.animated) ? entry.fileUrl : "";
+        return entry && !entry.item && entry.animated ? entry.fileUrl : "";
     }
 
     function swatchOf(entry) {
@@ -249,7 +238,6 @@ Item {
                 fileUrl: String(folderModel.get(i, "fileUrl")),
                 modified: folderModel.get(i, "fileModified"),
                 size: folderModel.get(i, "fileSize"),
-                video: WallpaperEngine.kind(folderModel.get(i, "fileName")) === "video",
                 animated: WallpaperEngine.kind(folderModel.get(i, "fileName")) === "animated"
             });
         }
@@ -372,14 +360,12 @@ Item {
         if (e.item && !isSaved(e) && downloading !== "" && downloading !== e.fileName)
             return;
         // Chosen first: the wallpaper under it then changes without its
-        // transition (see WallpaperEngine.pickerCovers). A video waits till
-        // the card's in the middle (arrived()).
+        // transition (see WallpaperEngine.pickerCovers).
         const animate = SettingsConfig.wallpaperAnimateChoice;
         if (animate)
             choose(e);
         if (!e.item) {
-            if (!animate || !e.video)
-                WallpaperEngine.set(e.fileUrl);
+            WallpaperEngine.set(e.fileUrl);
         } else if (isSaved(e)) {
             WallpaperEngine.set(Wallhaven.savePathFor(e.item));
         } else if (downloading === "") {
@@ -456,33 +442,18 @@ Item {
             keys.forceActiveFocus();
         chosenSet = false;
         awaiting = false;
-        settling = false;
         chosen = e;
         riseAnim.restart();
     }
 
-    // In the middle: on to the wallpaper, or wait for the download, or
-    // set a video and wait for it to be drawn.
+    // In the middle: continue once the wallpaper is set, or wait for a
+    // Wallhaven download.
     function arrived() {
-        if (!chosen.item && chosen.video && !isSet(chosen)) {
-            settling = true;
-            settleTimer.start();
-            WallpaperEngine.set(chosen.fileUrl);
-            if (WallpaperEngine.external)
-                settled();
-        } else if (isSet(chosen)) {
+        if (isSet(chosen)) {
             bloomAnim.restart();
         } else {
             awaiting = true;
         }
-    }
-
-    function settled() {
-        if (!settling)
-            return;
-        settling = false;
-        settleTimer.stop();
-        bloomAnim.restart();
     }
 
     // The picture fills the screen: the picker goes once the wallpaper
@@ -502,7 +473,6 @@ Item {
         riseAnim.stop();
         bloomAnim.stop();
         awaiting = false;
-        settling = false;
         place(currentIndex);
         const to = frontPlace();
         backAnim.toX = to.x;
@@ -518,8 +488,6 @@ Item {
         revealTimer.stop();
         chosen = null;
         awaiting = false;
-        settling = false;
-        settleTimer.stop();
         chosenSet = false;
         chosenLive = false;
         hush = 0;
@@ -657,15 +625,12 @@ Item {
             }
         }
 
-        // The wallpaper drawn under a chosen card: on with it (a video's,
-        // set as the card arrived), or time to go (once it has grown into
-        // the picture).
+        // The wallpaper drawn under a chosen card: time to go once the card
+        // has grown into the picture.
         function onDrawnChanged() {
             if (WallpaperEngine.drawn !== WallpaperEngine.current)
                 return;
-            if (window.settling) {
-                window.settled();
-            } else if (revealTimer.running) {
+            if (revealTimer.running) {
                 revealTimer.stop();
                 window.close();
             }
@@ -684,12 +649,6 @@ Item {
 
     Connections {
         target: WallpaperSwatches
-
-        // A video's frame, once it's grabbed.
-        function onRevisionChanged() {
-            if (!window.choosing && window.currentEntry && window.currentEntry.video && backdrop.wanted !== window.pictureOf(window.currentEntry))
-                backdropTimer.restart();
-        }
 
         // The colour sort, once every colour is in.
         function onScanFinished() {
@@ -814,13 +773,6 @@ Item {
         onTriggered: window.close()
     }
 
-    // Nor on a video starting up under the card in the middle.
-    Timer {
-        id: settleTimer
-        interval: 3000
-        onTriggered: window.settled()
-    }
-
     // Full resolution once the selection settles; a local picture as soon
     // as browsing slows down.
     Timer {
@@ -868,7 +820,7 @@ Item {
     FolderListModel {
         id: folderModel
         folder: window.srcDir
-        nameFilters: ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.gif", "*.mp4", "*.webm", "*.mkv", "*.mov", "*.m4v"]
+        nameFilters: ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.gif"]
         caseSensitive: false
         showDirs: false
         sortField: FolderListModel.Name
@@ -1506,7 +1458,7 @@ Item {
                 onClicked: window.setSettingsOpen(!window.settingsOpen)
             }
 
-            // The live preview: videos and animated pictures play.
+            // The live preview: animated pictures play.
             RoundButton {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: !window.online && window.hasMotion
@@ -1876,7 +1828,7 @@ Item {
 
     // ── The chosen card ──────────────────────────────────────────────────
     // The live preview as a texture, so the card in front (and a chosen
-    // one) shows the video playing too.
+    // one) shows the animation playing too.
     ShaderEffectSource {
         id: liveTexture
         width: window.width
@@ -1887,7 +1839,7 @@ Item {
         mipmap: true
     }
 
-    // What a chosen card's picture is drawn from: the video that was
+    // What a chosen card's picture is drawn from: the animation that was
     // playing behind it, or the preview's image once that shows the card
     // (sharper than the card's own, which shows till then).
     readonly property var chosenArt: {

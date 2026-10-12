@@ -5,13 +5,9 @@ import Quickshell.Io
 import QtQuick
 import qs.settings
 
-// The wallpaper, drawn by Quickshell itself (modules/wallpaper/WallpaperLayer)
-// instead of a separate daemon. `set()` starts the transition on every screen
-// and runs scripts/wallpaper-apply: ~/.cache/current_wallpaper_source points at
-// the file, ~/.cache/current_wallpaper at a still of it (the lock screens and
-// the Themes panel read that) and matugen makes the colour scheme from the
-// still. A wallpaper can be an image, an animated GIF/WebP or a video; a
-// video's still is a frame grabbed from it (scripts/wallpaper-still).
+// `set()` hands the wallpaper to Noctalia (or another configured wallpaper
+// command) and runs scripts/wallpaper-apply so the conventional
+// ~/.cache/current_wallpaper{,_source} links keep working.
 //
 // With a wallpaper command set (the picker's settings, e.g. `swww img {}`)
 // another program draws the wallpaper instead: WallpaperLayer makes no
@@ -51,12 +47,10 @@ Singleton {
 
     signal changed(string path)
 
-    // What a file is drawn as: "video", "animated" (GIF/WebP, which may
-    // still be one frame) or "image".
+    // What a file is drawn as: animated GIF/WebP (which may still be one
+    // frame), or a static image.
     function kind(path) {
         const p = String(path ?? "").toLowerCase();
-        if (/\.(mp4|webm|mkv|mov|m4v)$/.test(p))
-            return "video";
         if (/\.(gif|webp)$/.test(p))
             return "animated";
         return "image";
@@ -125,7 +119,7 @@ Singleton {
     }
 
     // Runs the wallpaper command on a file (see fileInCommand). A command still
-    // running after two seconds is taken for a daemon (swaybg, mpvpaper) and
+    // running after two seconds is taken for a daemon (such as swaybg) and
     // left running on its own; one that ends sooner reports how it went.
     function runCommand(path) {
         if (!external || !path)
@@ -166,8 +160,8 @@ Singleton {
         }
     }
 
-    // What was on screen last session (the still's link, from before
-    // videos had their own).
+    // What was on screen last session. Noctalia persists its own wallpaper;
+    // other external tools are replayed for backwards compatibility.
     Process {
         running: true
         command: ["sh", "-c", "for l in \"$1\" \"$2\"; do [ -e \"$l\" ] && exec readlink -f \"$l\"; done", "sh", root.sourceLink, root.link]
@@ -175,9 +169,8 @@ Singleton {
             onStreamFinished: {
                 if (!root.current) {
                     root.current = text.trim();
-                    // Tools that don't remember (swaybg, hyprpaper) get
-                    // last session's wallpaper back.
-                    root.runCommand(root.current);
+                    if (!root.command.startsWith("noctalia "))
+                        root.runCommand(root.current);
                 }
                 root.ready = true;
             }

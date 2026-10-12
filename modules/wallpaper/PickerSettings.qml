@@ -9,7 +9,7 @@ import qs.settings
 
 // The wallpaper picker's settings (the gear in its head): the folder it
 // lists, which Wallhaven downloads are saved to as well; the command that
-// sets a wallpaper when another program draws it (swww, swaybg, …); a
+// sets a wallpaper (Noctalia by default); a
 // Wallhaven API key; and whether a card set grows into the wallpaper. Each
 // field applies on Enter: a folder once it's found (or made), a command
 // after a try on the wallpaper on screen, a key after Wallhaven is asked
@@ -84,8 +84,8 @@ Rectangle {
         folderStatus = "saved";
     }
 
-    // Saved, then tried on the wallpaper on screen. Emptied, Quickshell
-    // draws the wallpaper again.
+    // Saved, then tried on the wallpaper on screen. Emptied, the optional
+    // built-in Quickshell wallpaper layer is used.
     function applyCommand() {
         const cmd = commandField.text.trim();
         SettingsConfig.wallpaperCommand = cmd;
@@ -308,7 +308,7 @@ Rectangle {
 
         Field {
             id: commandField
-            placeholderText: "Empty: Quickshell draws the wallpaper"
+            placeholderText: "noctalia msg wallpaper-set {}"
             font.family: "monospace"
             onAccepted: card.applyCommand()
             onTextEdited: card.commandStatus = ""
@@ -319,9 +319,9 @@ Rectangle {
             text: card.commandStatus === "running" ? "Trying it on the wallpaper on screen…"
                 : card.commandStatus === "ok" ? "It worked on the wallpaper on screen."
                 : card.commandStatus === "failed" ? "It failed: " + card.commandMessage
-                : card.commandEdited ? (commandField.text.trim() ? "Enter to use this command" : "Enter to let Quickshell draw the wallpaper again")
+                : card.commandEdited ? (commandField.text.trim() ? "Enter to use this command" : "Enter to use Quickshell's built-in wallpaper layer")
                 : SettingsConfig.wallpaperCommand ? "Setting a wallpaper runs this, with {} as the file."
-                : "To use your own wallpaper tool, e.g. swww img {} ({} is the file). Empty, Quickshell draws it, with transitions and videos."
+                : "No command: Quickshell draws images itself. For Noctalia use: noctalia msg wallpaper-set {}"
             color: card.commandStatus === "failed" ? Colors.error : card.commandStatus === "ok" ? card.accent : card.muted
         }
 

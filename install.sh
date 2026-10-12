@@ -13,12 +13,12 @@ SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/install-common.sh
 source "$SRC_DIR/scripts/install-common.sh"
 
-PACMAN_PKGS=(quickshell matugen ffmpeg curl python qt6-multimedia qt6-multimedia-ffmpeg qt6-imageformats)
-APT_PKGS=(ffmpeg curl python3)
-DNF_PKGS=(ffmpeg-free curl python3)
+PACMAN_PKGS=(quickshell noctalia curl python qt6-imageformats)
+APT_PKGS=(noctalia curl python3)
+DNF_PKGS=(noctalia curl python3)
 MANUAL=(
-    "quickshell (with Qt 6 Multimedia for videos): see https://quickshell.org"
-    "matugen: cargo install matugen, or a release from https://github.com/InioX/matugen"
+    "quickshell: see https://quickshell.org"
+    "noctalia: see https://docs.noctalia.dev/getting-started/installation/"
 )
 
 MODE=link
@@ -46,8 +46,7 @@ if ((DEPS)); then
 fi
 
 command -v quickshell >/dev/null || warn "quickshell is still missing"
-command -v matugen >/dev/null || warn "matugen is still missing: cards won't show colour schemes, and setting a wallpaper won't recolour anything"
-command -v ffmpeg >/dev/null || warn "ffmpeg is still missing: video wallpapers will have no still for their card"
+command -v noctalia >/dev/null || warn "noctalia is still missing: install Noctalia v5 for wallpaper setting and card palettes"
 
 install_config qs-wallpaperpicker
 install_command qs-wallpaperpicker
@@ -63,8 +62,8 @@ Done. Start it with
 
     qs-wallpaperpicker toggle
 
-It draws the wallpaper itself unless you give it a wallpaper command (for
-swww, swaybg, …) in the picker's settings, the gear at the top right. Put
+Noctalia draws and themes the wallpaper by default. You can change the
+wallpaper command in the picker's settings, the gear at the top right. Put
 wallpapers in ~/Pictures/wallpapers, or pick another folder there too.
 See README.md for more.
 MSG

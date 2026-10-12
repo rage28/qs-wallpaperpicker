@@ -4,7 +4,7 @@ import Quickshell
 import qs.colors
 
 // Palette and type for the lock screen HUD. The HUD always sits on a darkened
-// backdrop, so on a light matugen scheme the ink/base roles flip to their
+// backdrop, so on a light generated scheme the ink/base roles flip to their
 // inverse and the accents use the *_fixed_dim tones, which are the same in
 // light and dark schemes.
 Singleton {
