@@ -32,7 +32,22 @@ usage() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; }
 
 case ${1-start} in
     start)     exec qs -p "$cfg" --no-duplicate ;;
-    toggle)    exec qs -p "$cfg" ipc call wallpaper toggle ;;
+    toggle)
+        # A keybind should work even when the picker was not separately
+        # autostarted. The first call also handles the normal running case.
+        if qs -p "$cfg" ipc call wallpaper toggle >/dev/null 2>&1; then
+            exit 0
+        fi
+        setsid -f qs -p "$cfg" --no-duplicate >/dev/null 2>&1
+        for _ in {1..50}; do
+            sleep 0.1
+            if qs -p "$cfg" ipc call wallpaper toggle >/dev/null 2>&1; then
+                exit 0
+            fi
+        done
+        echo "qs-wallpaperpicker: picker did not become ready; inspect: qs-wallpaperpicker log" >&2
+        exit 1
+        ;;
     wallhaven) exec qs -p "$cfg" ipc call wallpaper wallhaven ;;
     set)
         [[ -n ${2-} ]] || { usage >&2; exit 1; }
