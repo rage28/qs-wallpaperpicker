@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 import qs.settings
+import "../lib/WallpaperLogic.js" as WallpaperLogic
 
 // `set()` hands the wallpaper to Noctalia (or another configured wallpaper
 // command) and runs scripts/wallpaper-apply so the conventional
@@ -50,31 +51,21 @@ Singleton {
     // What a file is drawn as: animated GIF/WebP (which may still be one
     // frame), or a static image.
     function kind(path) {
-        const p = String(path ?? "").toLowerCase();
-        if (/\.(gif|webp)$/.test(p))
-            return "animated";
-        return "image";
+        return WallpaperLogic.kind(path);
     }
 
     // "~" and "~/…" to absolute paths.
     function expandHome(path) {
-        const p = String(path ?? "").trim();
-        if (p === "~" || p.startsWith("~/"))
-            return Quickshell.env("HOME") + p.substring(1);
-        return p;
+        return WallpaperLogic.expandHome(path, Quickshell.env("HOME"));
     }
 
     // A path the other way round, for showing.
     function tildeHome(path) {
-        const home = Quickshell.env("HOME");
-        return path === home || path.startsWith(home + "/") ? "~" + path.substring(home.length) : path;
+        return WallpaperLogic.tildeHome(path, Quickshell.env("HOME"));
     }
 
     function resolve(path) {
-        let p = expandHome(String(path ?? "").trim().replace(/^file:\/\//, ""));
-        if (p.length > 0 && !p.startsWith("/"))
-            p = dir + "/" + p;
-        return p;
+        return WallpaperLogic.resolve(path, dir, Quickshell.env("HOME"));
     }
 
     function set(path) {
@@ -93,29 +84,7 @@ Singleton {
     // quoted for wherever the `{}` stands (bare, in "…" or in '…'), and with
     // no `{}` the file goes last.
     function fileInCommand(cmd) {
-        let out = "";
-        let quote = "";
-        let found = false;
-        for (let i = 0; i < cmd.length; i++) {
-            const c = cmd[i];
-            if (c === "{" && cmd[i + 1] === "}") {
-                found = true;
-                i++;
-                out += quote === "'" ? "'\"$1\"'" : quote === "\"" ? "$1" : "\"$1\"";
-                continue;
-            }
-            if (c === "\\" && quote !== "'") {
-                out += c + (cmd[i + 1] ?? "");
-                i++;
-                continue;
-            }
-            if (quote === "" && (c === "'" || c === "\""))
-                quote = c;
-            else if (c === quote)
-                quote = "";
-            out += c;
-        }
-        return found ? out : out + ' "$1"';
+        return WallpaperLogic.fileInCommand(cmd);
     }
 
     // Runs the wallpaper command on a file (see fileInCommand). A command still

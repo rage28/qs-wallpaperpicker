@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import "../lib/WallpaperLogic.js" as WallpaperLogic
 
 // The picker's settings, kept in the user's config directory. The
 // folder, command, API key and the chosen card's animation are set from the
@@ -39,14 +40,12 @@ Singleton {
     }
 
     function migrateWallpaperSettings() {
-        if (settingsAdapter.wallpaperSettingsVersion >= 1)
-            return;
+        const migrated = WallpaperLogic.migrateWallpaperSettings(settingsAdapter.wallpaperCommand, settingsAdapter.wallpaperSettingsVersion);
         // Existing installs used an empty command for the built-in renderer.
         // Move them to the new Noctalia owner once; users may still clear it
         // afterwards to opt back into the built-in image layer.
-        if (settingsAdapter.wallpaperCommand.trim() === "")
-            settingsAdapter.wallpaperCommand = "noctalia msg wallpaper-set {}";
-        settingsAdapter.wallpaperSettingsVersion = 1;
+        settingsAdapter.wallpaperCommand = migrated.command;
+        settingsAdapter.wallpaperSettingsVersion = migrated.version;
     }
 
     FileView {

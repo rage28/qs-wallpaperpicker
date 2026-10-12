@@ -8,6 +8,7 @@ import qs.colors
 import qs.components
 import qs.modules.lock
 import qs.settings
+import "../../lib/WallpaperLogic.js" as WallpaperLogic
 
 // Wallpaper picker (SUPER+W, `qs ipc call wallpaper toggle|wallhaven`): a
 // deck of swatch cards.
@@ -80,7 +81,7 @@ Item {
         if (!favoritesOnly)
             return sortedWallpapers;
         const favs = WallpaperFavorites.favorites;
-        return sortedWallpapers.filter(w => favs.indexOf(w.fileName) >= 0);
+        return WallpaperLogic.filterFavorites(sortedWallpapers, favs);
     }
     // Local file names, for "already saved" checks on Wallhaven results.
     readonly property var localNames: {
@@ -176,16 +177,15 @@ Item {
     }
 
     function baseName(name) {
-        const dot = name.lastIndexOf(".");
-        return dot > 0 ? name.substring(0, dot) : name;
+        return WallpaperLogic.baseName(name);
     }
 
     function bytes(n) {
-        return n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
+        return WallpaperLogic.bytes(n);
     }
 
     function compact(n) {
-        return n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "k" : String(n);
+        return WallpaperLogic.compact(n);
     }
 
     // The line under a card's name.
@@ -249,16 +249,7 @@ Item {
     }
 
     function resort() {
-        const list = allWallpapers.map((w, i) => ({ w, i }));
-        if (sort === "newest") {
-            list.sort((a, b) => (b.w.modified - a.w.modified) || (a.i - b.i));
-        } else if (sort === "colour") {
-            const key = {};
-            for (const x of list)
-                key[x.w.fileName] = WallpaperSwatches.hueKey(x.w.fileName);
-            list.sort((a, b) => (key[a.w.fileName] - key[b.w.fileName]) || (a.i - b.i));
-        }
-        sortedWallpapers = list.map(x => x.w);
+        sortedWallpapers = WallpaperLogic.sortWallpapers(allWallpapers, sort, name => WallpaperSwatches.hueKey(name));
     }
 
     function setSort(s) {
